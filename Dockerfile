@@ -1,30 +1,47 @@
-FROM hypriot/rpi-node
-
-ENV NPM_CONFIG_LOGLEVEL warn
+FROM arm32v6/alpine
 
 USER root
 WORKDIR /root/
 
-WORKDIR /var/www/
+RUN 	mkdir -p /var/www/ghost
+WORKDIR	/var/www/ghost/
 
-# Install app dependencies
-RUN npm install -g ghost-cli
+RUN 	apk update && \
+	apk upgrade && \
+	apk add curl --update
 
-RUN addgroup www-data
-RUN adduser ghost -G www-data -S /bin/bash
-RUN chown ghost:www-data .
+RUN	apk add --update \
+	python \
+	python-dev \
+	py-pip \
+	build-base
+
+RUN	apk add nodejs-lts --update && \
+	apk add nodejs-npm --update && \
+	curl -sSLO https://github.com/TryGhost/Ghost/releases/download/0.11.8/Ghost-0.11.8.zip && \
+	unzip Ghost-0.11.8.zip
+
+RUN 	addgroup www-data
+RUN	adduser -D  -h /home/ghost -s /bin/sh ghost -G www-data
+RUN	chown ghost:www-data .
+RUN	chown ghost:www-data -R *
+
+RUN 	npm install -g pm2
 
 USER ghost
-WORKDIR /var/www/
-RUN mkdir -p ghost
 WORKDIR /var/www/ghost
-
-RUN ghost install local --no-start
+	
+RUN 	npm install
 
 EXPOSE 2368
 EXPOSE 2369
 
-ENV NODE_ENV production
-RUN sed -ie s/127.0.0.1/0.0.0.0/g config.development.json
+RUN	ls && pwd
 
-CMD ["ghost", "run", "--development", "--ip", "0.0.0.0"]
+RUN	sed -e s/127.0.0.1/0.0.0.0/g ./config.example.js > ./config.js
+
+VOLUME ["/var/www/ghost/content/apps"]
+VOLUME ["/var/www/ghost/content/data"]
+VOLUME ["/var/www/ghost/content/images"]
+
+CMD ["pm2", "start", "index.js", "--name", "blog", "--no-daemon"]
